@@ -1,0 +1,75 @@
+name: Terraform - Infra Kubernetes
+
+on:
+  pull_request:
+    branches: [master, producao]
+  push:
+    branches: [producao]
+
+# AWS Academy: credenciais de sessão temporárias (expiram com o Lab), não
+# suporta OIDC nem IAM role de longa duração — ver README > "AWS Academy".
+env:
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
+  AWS_DEFAULT_REGION: us-east-1
+
+jobs:
+  plan:
+    name: Plan
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+
+      - name: Terraform Init
+        run: terraform init -input=false
+
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        run: |
+          terraform plan -input=false -no-color \
+            -var="lab_role_arn=${{ secrets.AWS_LAB_ROLE_ARN }}" \
+            -var="new_relic_license_key=${{ secrets.NEW_RELIC_LICENSE_KEY }}" \
+            -var="new_relic_account_id=${{ secrets.NEW_RELIC_ACCOUNT_ID }}" \
+            -var="new_relic_api_key=${{ secrets.NEW_RELIC_API_KEY }}" \
+            -var="new_relic_notification_email=${{ secrets.NEW_RELIC_NOTIFICATION_EMAIL }}" \
+            -out=tfplan
+
+  apply:
+    name: Apply
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    environment: producao
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+
+      - name: Terraform Init
+        run: terraform init -input=false
+
+      - name: Terraform Apply
+        run: |
+          terraform apply -auto-approve -input=false \
+            -var="lab_role_arn=${{ secrets.AWS_LAB_ROLE_ARN }}" \
+            -var="new_relic_license_key=${{ secrets.NEW_RELIC_LICENSE_KEY }}" \
+            -var="new_relic_account_id=${{ secrets.NEW_RELIC_ACCOUNT_ID }}" \
+            -var="new_relic_api_key=${{ secrets.NEW_RELIC_API_KEY }}" \
+            -var="new_relic_notification_email=${{ secrets.NEW_RELIC_NOTIFICATION_EMAIL }}"
+
+      - name: Atualizar kubeconfig e checar nodes
+        run: |
+          aws eks update-kubeconfig --name soat-producao --region us-east-1
+          kubectl get nodes
