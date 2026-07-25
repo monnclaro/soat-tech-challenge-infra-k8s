@@ -2,9 +2,9 @@ name: Terraform - Infra Kubernetes
 
 on:
   pull_request:
-    branches: [master, producao]
+    branches: [main]
   push:
-    branches: [producao]
+    branches: [main]
 
 # AWS Academy: credenciais de sessão temporárias (expiram com o Lab), não
 # suporta OIDC nem IAM role de longa duração — ver README > "AWS Academy".

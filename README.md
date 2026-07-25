@@ -75,7 +75,7 @@ kubectl get nodes
 
 ## CI/CD
 
-[.github/workflows/terraform.yml](.github/workflows/terraform.yml): PR aciona `plan`, push em `producao` aciona `apply` (gated por aprovação manual do GitHub Environment `producao`). Segredos necessários: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN` (do Academy, expiram com a sessão — atualizar antes de cada rodada), `AWS_LAB_ROLE_ARN`, `NEW_RELIC_LICENSE_KEY`, `NEW_RELIC_ACCOUNT_ID`, `NEW_RELIC_API_KEY`, `NEW_RELIC_NOTIFICATION_EMAIL`.
+[.github/workflows/terraform.yml](.github/workflows/terraform.yml): PR aciona `plan`, push em `main` aciona `apply` (gated por aprovação manual do GitHub Environment `producao`, que se refere ao ambiente AWS de destino). Segredos necessários: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN` (do Academy, expiram com a sessão — atualizar antes de cada rodada), `AWS_LAB_ROLE_ARN`, `NEW_RELIC_LICENSE_KEY`, `NEW_RELIC_ACCOUNT_ID`, `NEW_RELIC_API_KEY`, `NEW_RELIC_NOTIFICATION_EMAIL`.
 
 ## Observabilidade
 
