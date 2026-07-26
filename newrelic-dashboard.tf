@@ -1,6 +1,6 @@
 # Dashboard operacional da oficina — atende aos requisitos de observabilidade:
 # latência das APIs, consumo de CPU/memória do cluster, healthcheck/uptime,
-# volume diário de OS, tempo médio de execução por status e erros de integração.
+# volume diário de OS, tempo por fase (funil de status) e erros de integração.
 # NRQL assume: (a) o app reporta como "soat-api" no APM (NEW_RELIC_APP_NAME,
 # ver k8s/configmap.yaml no repo da aplicação); (b) o nri-bundle (newrelic.tf)
 # está enviando K8sContainerSample para este cluster.
@@ -102,22 +102,39 @@ resource "newrelic_one_dashboard" "operacional" {
       }
     }
 
-    widget_table {
-      title  = "Tempo médio de execução por status (Diagnóstico, Execução, Finalização)"
+    widget_funnel {
+      title  = "Ordens de serviço por fase (Recebida → Entregue)"
       row    = 1
       column = 7
       width  = 6
       height = 3
 
       nrql_query {
-        # PENDENTE DE INSTRUMENTAÇÃO: a entidade OrdemServico já guarda
-        # DataCriacao/DataInicioExecucao/DataFinalizacao, mas nenhum lugar do
-        # código hoje emite um evento customizado do New Relic com essa
-        # duração. Este widget assume um evento "OrdemServicoStatusAlterado"
-        # (atributos: status, duracaoSegundos) que precisa ser emitido pela
-        # aplicação — ver docs/observabilidade.md > "Gaps conhecidos" no repo
-        # da aplicação para o plano de instrumentação.
-        query = "SELECT average(duracaoSegundos) FROM OrdemServicoStatusAlterado FACET status SINCE 7 days ago"
+        # A app loga (Serilog, JSON) "OrdemServicoStatusAlterado {idOrdemServico}
+        # {status}" a cada transição de status (OrdemServico.Inserir,
+        # IniciarDiagnostico, FinalizarDiagnostico, AprovarOrcamento, Finalizar,
+        # Entregar — ver OrdemServicoStatusAlteradoLogHandler no repo da app),
+        # sem calcular duração no código e sem depender de NewRelic.Api.Agent/
+        # RecordCustomEvent. O nri-bundle (newrelic.tf, logging.enabled = true)
+        # já coleta e parseia os logs JSON dos pods, promovendo cada propriedade
+        # nomeada do template a um atributo de Log consultável via NRQL. O tempo
+        # entre fases é o que o funnel() calcula a partir do timestamp de cada
+        # log, correlacionado por idOrdemServico — nenhum timestamp de "início da
+        # fase atual" precisou ser persistido na entidade.
+        #
+        # Best-effort: sem ambiente aplicado até esta entrega, não há logs reais
+        # pra validar contra a UI do New Relic. Conferir nomes de atributo
+        # (idOrdemServico/status) e ajustar se necessário assim que houver dados.
+        query = <<-EOT
+          SELECT funnel(timestamp,
+            WHERE status = 'Recebida' AS 'Recebida',
+            WHERE status = 'EmDiagnostico' AS 'EmDiagnostico',
+            WHERE status = 'AguardandoAprovacao' AS 'AguardandoAprovacao',
+            WHERE status = 'EmExecucao' AS 'EmExecucao',
+            WHERE status = 'Finalizada' AS 'Finalizada',
+            WHERE status = 'Entregue' AS 'Entregue'
+          ) FROM Log WHERE idOrdemServico IS NOT NULL FACET idOrdemServico SINCE 30 days ago
+        EOT
       }
     }
 
