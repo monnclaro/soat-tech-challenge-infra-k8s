@@ -20,6 +20,11 @@ terraform {
     }
   }
 
+  # Backend remoto — state compartilhado entre execuções de CI/CD (a AWS
+  # Academy reseta a conta entre sessões, então bucket/tabela não podem
+  # depender de terem sido criados manualmente uma única vez). O workflow
+  # (.github/workflows/terraform.yml) cria bucket e tabela se não existirem,
+  # antes do terraform init — idempotente, roda em todo PR/push.
   backend "s3" {
     bucket         = "soat-tech-challenge-tfstate"
     key            = "infra-k8s/terraform.tfstate"
