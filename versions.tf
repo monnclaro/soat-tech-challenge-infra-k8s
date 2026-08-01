@@ -26,10 +26,10 @@ terraform {
   # (.github/workflows/terraform.yml) cria bucket e tabela se não existirem,
   # antes do terraform init — idempotente, roda em todo PR/push.
   backend "s3" {
-    bucket         = "soat-tech-challenge-tfstate"
+    bucket         = "soat-tech-challenge-tfstate-augusto"
     key            = "infra-k8s/terraform.tfstate"
     region         = "us-east-1"
-    dynamodb_table = "soat-tech-challenge-tfstate-lock"
+    dynamodb_table = "soat-tech-challenge-tfstate-lock-augusto"
     encrypt        = true
   }
 }
