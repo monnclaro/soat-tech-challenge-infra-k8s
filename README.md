@@ -12,7 +12,7 @@ Este repo **não** faz deploy da aplicação — isso é responsabilidade do rep
 
 | Componente | Tecnologia |
 |---|---|
-| IaC | Terraform ~> 1.9, módulos `terraform-aws-modules/vpc` e `terraform-aws-modules/eks` |
+| IaC | Terraform ~> 1.9, módulo `terraform-aws-modules/vpc`; EKS via recursos `aws_eks_*` diretos, não o módulo da comunidade (ver `eks.tf`) |
 | Cluster | Amazon EKS 1.31, node group gerenciado (`t3.small`, 1–4 nodes) |
 | Exposição da app | `Service type=NodePort` (repo da app) — sem ALB, ver nota de custo |
 | Observabilidade | New Relic Kubernetes integration (`nri-bundle` Helm chart) + dashboard + alertas |
@@ -26,8 +26,9 @@ Esta infraestrutura foi desenhada para caber no **AWS Academy Learner Lab**, cor
 |---|---|---|
 | NAT Gateway (~$32/mês) | Custo fixo, sem free tier | Nodes do EKS em **subnet pública**, com IP próprio, saindo direto pela Internet Gateway |
 | ALB + AWS Load Balancer Controller (~$16-20/mês) | Custo fixo + exigiria IRSA (IAM restrito no Academy) | `Service type=NodePort` — o API Gateway (repo lambda) chama direto o IP público de um node |
-| Criação de IAM roles/policies (cluster, node group, IRSA) | Academy bloqueia `iam:CreateRole`/`iam:CreateOpenIDConnectProvider` | Reaproveita a `LabRole` já existente na conta (`var.lab_role_arn`) — `enable_irsa = false`, `create_iam_role = false` |
-| KMS key própria para secrets do cluster | `kms:CreateKey` também costuma estar fora da policy do Academy | `cluster_encryption_config = {}` (sem envelope encryption customizada) |
+| Criação de IAM roles/policies (cluster, node group, IRSA) | Academy bloqueia `iam:CreateRole`/`iam:CreateOpenIDConnectProvider` | Reaproveita a `LabRole` já existente na conta (`var.lab_role_arn`) — sem OIDC provider, sem role própria pro cluster/node group |
+| Módulo `terraform-aws-modules/eks/aws` | Declara `data.aws_iam_session_context` incondicional, que precisa de `iam:GetRole` — negado explicitamente pela policy do Academy (`Pvoclabs2`) em toda versão testada (19.x/20.x/21.x), mesmo sem usar o valor | `eks.tf` com recursos `aws_eks_cluster`/`aws_eks_node_group`/`aws_eks_addon` diretos |
+| KMS key própria para secrets do cluster | `kms:CreateKey` também costuma estar fora da policy do Academy | Sem `encryption_config` no `aws_eks_cluster` (sem envelope encryption customizada) |
 | Autenticação OIDC do GitHub Actions | Exigiria criar um IAM Identity Provider (bloqueado) | Credenciais de sessão estáticas do Academy como GitHub Secrets, atualizadas manualmente a cada sessão do Lab |
 
 Único custo fixo que **não** dá pra remover usando EKS: o control plane (~$0,10/h). Justificativa completa e trade-offs: ADR "Prioridade de custo e AWS Academy" (`soat-tech-challenge/docs/adr`).

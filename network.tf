@@ -48,7 +48,7 @@ resource "aws_ssm_parameter" "private_subnet_ids" {
 resource "aws_ssm_parameter" "eks_node_sg_id" {
   name  = "/soat/${var.environment}/network/eks-node-sg-id"
   type  = "String"
-  value = module.eks.node_security_group_id
+  value = aws_eks_cluster.this.vpc_config[0].cluster_security_group_id
 }
 
 # Publicado para o infra-database liberar 5432 por CIDR (em vez de por SG

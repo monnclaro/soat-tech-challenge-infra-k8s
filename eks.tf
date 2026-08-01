@@ -3,53 +3,27 @@
 #
 # IAM restrito (AWS Academy): não criamos nenhuma role — cluster e node group
 # reaproveitam a LabRole já existente na conta (var.lab_role_arn). Por isso
-# também: enable_irsa = false (criar o OIDC provider é uma ação de IAM
-# bloqueada no Academy) e sem KMS key própria para envelope encryption dos
-# Secrets do cluster (kms:CreateKey também costuma estar fora da policy do
-# Academy). Ver ADR 0008.
+# também: sem OIDC provider (IRSA) e sem KMS key própria para envelope
+# encryption dos Secrets do cluster (kms:CreateKey também costuma estar fora
+# da policy do Academy). Ver ADR 0008.
+#
+# Recursos escritos à mão (aws_eks_cluster/aws_eks_node_group/aws_eks_addon),
+# não o módulo terraform-aws-modules/eks/aws: o módulo declara internamente
+# um data "aws_iam_session_context" incondicional, que chama iam:GetRole na
+# role por trás da sessão STS do Academy ("voclabs") — e o Academy tem um deny
+# explícito pra essa chamada (policy Pvoclabs2), em toda versão do módulo
+# testada (19.x/20.x/21.x), mesmo quando o valor resolvido não é usado pela
+# nossa configuração. Escrevendo os recursos direto, essa chamada nunca
+# acontece.
 
-module "eks" {
-  source  = "terraform-aws-modules/eks/aws"
-  version = "~> 20.24"
+resource "aws_eks_cluster" "this" {
+  name     = "soat-${var.environment}"
+  version  = var.cluster_version
+  role_arn = var.lab_role_arn
 
-  cluster_name    = "soat-${var.environment}"
-  cluster_version = var.cluster_version
-
-  vpc_id                   = module.vpc.vpc_id
-  subnet_ids               = module.vpc.public_subnets
-  control_plane_subnet_ids = module.vpc.public_subnets
-
-  cluster_endpoint_public_access = true
-
-  create_iam_role = false
-  iam_role_arn    = var.lab_role_arn
-
-  enable_irsa               = false
-  create_kms_key            = false
-  cluster_encryption_config = {}
-
-  eks_managed_node_groups = {
-    default = {
-      instance_types = var.node_instance_types
-      capacity_type  = "ON_DEMAND"
-
-      min_size     = var.node_min_size
-      max_size     = var.node_max_size
-      desired_size = var.node_desired_size
-
-      create_iam_role = false
-      iam_role_arn    = var.lab_role_arn
-
-      labels = {
-        workload = "soat-api"
-      }
-    }
-  }
-
-  cluster_addons = {
-    coredns    = { most_recent = true }
-    kube-proxy = { most_recent = true }
-    vpc-cni    = { most_recent = true }
+  vpc_config {
+    subnet_ids             = module.vpc.public_subnets
+    endpoint_public_access = true
   }
 
   tags = {
@@ -57,14 +31,82 @@ module "eks" {
   }
 }
 
+resource "aws_eks_node_group" "default" {
+  cluster_name    = aws_eks_cluster.this.name
+  node_group_name = "default"
+  node_role_arn   = var.lab_role_arn
+  subnet_ids      = module.vpc.public_subnets
+
+  instance_types = var.node_instance_types
+  capacity_type  = "ON_DEMAND"
+
+  scaling_config {
+    min_size     = var.node_min_size
+    max_size     = var.node_max_size
+    desired_size = var.node_desired_size
+  }
+
+  labels = {
+    workload = "soat-api"
+  }
+
+  tags = {
+    Ambiente = var.environment
+  }
+}
+
+# most_recent = true, equivalente ao que o módulo fazia — resolve a versão
+# mais recente compatível com a versão do cluster, em vez do default do EKS.
+data "aws_eks_addon_version" "coredns" {
+  addon_name         = "coredns"
+  kubernetes_version = aws_eks_cluster.this.version
+  most_recent        = true
+}
+
+data "aws_eks_addon_version" "kube_proxy" {
+  addon_name         = "kube-proxy"
+  kubernetes_version = aws_eks_cluster.this.version
+  most_recent        = true
+}
+
+data "aws_eks_addon_version" "vpc_cni" {
+  addon_name         = "vpc-cni"
+  kubernetes_version = aws_eks_cluster.this.version
+  most_recent        = true
+}
+
+resource "aws_eks_addon" "coredns" {
+  cluster_name  = aws_eks_cluster.this.name
+  addon_name    = "coredns"
+  addon_version = data.aws_eks_addon_version.coredns.version
+
+  depends_on = [aws_eks_node_group.default]
+}
+
+resource "aws_eks_addon" "kube_proxy" {
+  cluster_name  = aws_eks_cluster.this.name
+  addon_name    = "kube-proxy"
+  addon_version = data.aws_eks_addon_version.kube_proxy.version
+
+  depends_on = [aws_eks_node_group.default]
+}
+
+resource "aws_eks_addon" "vpc_cni" {
+  cluster_name  = aws_eks_cluster.this.name
+  addon_name    = "vpc-cni"
+  addon_version = data.aws_eks_addon_version.vpc_cni.version
+
+  depends_on = [aws_eks_node_group.default]
+}
+
 resource "aws_ssm_parameter" "cluster_name" {
   name  = "/soat/${var.environment}/eks/cluster-name"
   type  = "String"
-  value = module.eks.cluster_name
+  value = aws_eks_cluster.this.name
 }
 
 resource "aws_ssm_parameter" "cluster_endpoint" {
   name  = "/soat/${var.environment}/eks/cluster-endpoint"
   type  = "String"
-  value = module.eks.cluster_endpoint
+  value = aws_eks_cluster.this.endpoint
 }

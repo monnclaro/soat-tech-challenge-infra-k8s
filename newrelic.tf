@@ -33,7 +33,7 @@ resource "helm_release" "newrelic_bundle" {
 
   set {
     name  = "global.cluster"
-    value = module.eks.cluster_name
+    value = aws_eks_cluster.this.name
   }
 
   set {
@@ -56,5 +56,5 @@ resource "helm_release" "newrelic_bundle" {
     value = "true"
   }
 
-  depends_on = [module.eks]
+  depends_on = [aws_eks_node_group.default]
 }
