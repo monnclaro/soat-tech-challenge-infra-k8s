@@ -55,6 +55,20 @@ resource "aws_eks_node_group" "default" {
   }
 }
 
+# EKS cria e anexa automaticamente a "cluster security group" aos nodes, mas
+# ela não libera nada pra internet por padrão — precisa dessa regra explícita
+# pro API Gateway (repo lambda) alcançar o Service NodePort direto no node,
+# já que não tem ALB na frente (ver ADR 0008).
+resource "aws_security_group_rule" "node_nodeport_ingress" {
+  description       = "NodePort do soat-api (k8s/service.yaml), alcancado direto pelo API Gateway"
+  type              = "ingress"
+  from_port         = 30080
+  to_port           = 30080
+  protocol          = "tcp"
+  cidr_blocks       = ["0.0.0.0/0"]
+  security_group_id = aws_eks_cluster.this.vpc_config[0].cluster_security_group_id
+}
+
 # most_recent = true, equivalente ao que o módulo fazia — resolve a versão
 # mais recente compatível com a versão do cluster, em vez do default do EKS.
 data "aws_eks_addon_version" "coredns" {
