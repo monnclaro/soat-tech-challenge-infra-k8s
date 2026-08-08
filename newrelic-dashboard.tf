@@ -98,7 +98,11 @@ resource "newrelic_one_dashboard" "operacional" {
       height = 3
 
       nrql_query {
-        query = "SELECT count(*) FROM Transaction WHERE appName = 'soat-api' AND name LIKE '%OrdemServico%' AND http.method = 'POST' FACET dateOf(timestamp) SINCE 30 days ago"
+        # http.method vem vazio nas transações WebTransaction/MVC do agente
+        # .NET (confirmado consultando dados reais), então filtrar por ele
+        # nunca bate. O nome da transação já identifica a criação de OS sem
+        # precisar disso: "WebTransaction/MVC/OrdemServicos/Inserir/...".
+        query = "SELECT count(*) FROM Transaction WHERE appName = 'soat-api' AND name LIKE '%OrdemServicos/Inserir%' FACET dateOf(timestamp) SINCE 30 days ago"
       }
     }
 
