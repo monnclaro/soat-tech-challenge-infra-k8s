@@ -1,20 +1,21 @@
 # soat-tech-challenge-infra-k8s
 
-> Infraestrutura como código (Terraform) do cluster Kubernetes gerenciado (Amazon EKS) da oficina — parte da Fase 3 do Tech Challenge FIAP: [app](https://github.com/monnclaro/soat-tech-challenge) · **infra-k8s** (este repositório) · [infra-database](https://github.com/monnclaro/soat-tech-challenge-infra-database) · [lambda](https://github.com/monnclaro/soat-tech-challenge-lambda).
+> Infraestrutura como código (Terraform) do cluster Kubernetes gerenciado (Amazon EKS) compartilhado pelos microsserviços da oficina. Nasceu na Fase 3 (1 aplicação monolítica) e passou a hospedar 3 microsserviços na Fase 4: [os-service](https://github.com/monnclaro/soat-tech-challenge-os-service) · [billing-service](https://github.com/monnclaro/soat-tech-challenge-billing-service) · [execution-service](https://github.com/monnclaro/soat-tech-challenge-execution-service) · **infra-k8s** (este repositório) · [infra-database](https://github.com/monnclaro/soat-tech-challenge-infra-database) · [lambda](https://github.com/monnclaro/soat-tech-challenge-lambda). O monolito original ([soat-tech-challenge](https://github.com/monnclaro/soat-tech-challenge)) permanece como referência histórica das Fases 1-3.
 
 ## Propósito
 
-Provisiona a **rede (VPC)** e o **cluster Kubernetes (EKS)** onde a aplicação principal roda, com node group escalável e a integração de observabilidade do New Relic no nível de cluster. É o único repositório com autoridade sobre a VPC — os demais (infra-database, lambda) consomem seus outputs via SSM Parameter Store.
+Provisiona a **rede (VPC)** e o **cluster Kubernetes (EKS)** compartilhado pelos 3 microsserviços, com node group escalável e infraestrutura de plataforma comum: observabilidade (New Relic) e mensageria (RabbitMQ, desde a Fase 4). É o único repositório com autoridade sobre a VPC — os demais (infra-database, os-service, billing-service, execution-service, lambda) consomem seus outputs via SSM Parameter Store.
 
-Este repo **não** faz deploy da aplicação — isso é responsabilidade do repositório [soat-tech-challenge](https://github.com/monnclaro/soat-tech-challenge), que aplica seus próprios manifests Kubernetes contra o cluster já provisionado aqui.
+Este repo **não** faz deploy de nenhuma aplicação — isso é responsabilidade de cada repositório de microsserviço, que aplica seus próprios manifests Kubernetes (`k8s/`) contra o cluster já provisionado aqui.
 
 ## Tecnologias
 
 | Componente | Tecnologia |
 |---|---|
 | IaC | Terraform ~> 1.9, módulo `terraform-aws-modules/vpc`; EKS via recursos `aws_eks_*` diretos, não o módulo da comunidade (ver `eks.tf`) |
-| Cluster | Amazon EKS 1.31, node group gerenciado (`t3.small`, 1–4 nodes) |
-| Exposição da app | `Service type=NodePort` (repo da app) — sem ALB, ver nota de custo |
+| Cluster | Amazon EKS 1.31, node group gerenciado (`t3.small`, 2–4 nodes — min 2 desde a Fase 4) |
+| Exposição das apps | `Service type=NodePort` por microsserviço (30081/30082/30083) — sem ALB, ver nota de custo |
+| Mensageria | RabbitMQ (`bitnami/rabbitmq` Helm chart, 1 réplica) — broker compartilhado entre os 3 microsserviços para a saga |
 | Observabilidade | New Relic Kubernetes integration (`nri-bundle` Helm chart) + dashboard + alertas |
 | CI/CD | GitHub Actions (credenciais estáticas de sessão — AWS Academy) |
 
@@ -52,7 +53,7 @@ Esta infraestrutura foi desenhada para caber no **AWS Academy Learner Lab**, cor
      IP público do node + NodePort (ver README do repo lambda)
 ```
 
-Publica em SSM: `/soat/producao/network/vpc-id`, `/soat/producao/network/private-subnet-ids`, `/soat/producao/network/vpc-cidr`, `/soat/producao/eks/cluster-name`, `/soat/producao/eks/cluster-endpoint`.
+Publica em SSM: `/soat/producao/network/vpc-id`, `/soat/producao/network/private-subnet-ids`, `/soat/producao/network/vpc-cidr`, `/soat/producao/eks/cluster-name`, `/soat/producao/eks/cluster-endpoint`, `/soat/producao/jwt/secret`, `/soat/producao/rabbitmq/{host,username,password}` (desde a Fase 4 — consumidos pelo CI/CD dos 3 microsserviços para gerar o Secret do deployment).
 
 ## Backend remoto
 
@@ -86,6 +87,10 @@ Além da integração de infraestrutura (`newrelic.tf`), este repositório provi
 - **Alertas** (e-mail via `newrelic_workflow`): nenhum pod da API disponível, taxa de erro alta em rotas de Ordem de Serviço, falhas no webhook de orçamento.
 
 Sem ALB/domínio público fixo, o "uptime" é medido por proxy (contagem de pods prontos + taxa de sucesso das transações do APM), não por um Synthetics Monitor HTTP tradicional — ver comentários em `newrelic-alerts.tf`.
+
+## Mensageria (Fase 4)
+
+`rabbitmq.tf` provisiona um único broker RabbitMQ (`bitnami/rabbitmq`, namespace `rabbitmq`, 1 réplica — sem alta disponibilidade, projeto acadêmico) compartilhado pelos 3 microsserviços para a saga orquestrada da Ordem de Serviço. Credenciais geradas via `random_password` e publicadas em SSM (`/soat/producao/rabbitmq/*`), no mesmo padrão do segredo JWT (`jwt.tf`) — cada microsserviço lê de lá no seu próprio deploy para montar o Secret do deployment.
 
 ## Links
 
