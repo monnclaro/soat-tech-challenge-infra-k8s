@@ -48,8 +48,9 @@ variable "node_instance_types" {
 }
 
 variable "node_min_size" {
-  type    = number
-  default = 1
+  description = "2 desde a Fase 4: 3 APIs de microsserviço + RabbitMQ + MongoDB (repo do Execução Service) + agente do New Relic não cabem confortavelmente em 1 node t3.small (ver rabbitmq.tf e ADR 0008 atualizada em soat-tech-challenge)."
+  type        = number
+  default     = 2
 }
 
 variable "node_max_size" {
@@ -59,7 +60,7 @@ variable "node_max_size" {
 
 variable "node_desired_size" {
   type    = number
-  default = 1
+  default = 2
 }
 
 variable "new_relic_license_key" {

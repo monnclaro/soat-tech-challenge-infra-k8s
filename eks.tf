@@ -69,6 +69,40 @@ resource "aws_security_group_rule" "node_nodeport_ingress" {
   security_group_id = aws_eks_cluster.this.vpc_config[0].cluster_security_group_id
 }
 
+# Fase 4: os 3 microsserviços (OS/Billing/Execução) rodam no mesmo cluster,
+# cada um com seu próprio NodePort fixo — mesmo racional da regra acima, uma
+# por serviço em vez de um range, para deixar explícito qual porta pertence a
+# qual repositório (ver k8s/service.yaml de cada um).
+resource "aws_security_group_rule" "node_nodeport_ingress_os_service" {
+  description       = "NodePort do soat-os-service (k8s/service.yaml)"
+  type              = "ingress"
+  from_port         = 30081
+  to_port           = 30081
+  protocol          = "tcp"
+  cidr_blocks       = ["0.0.0.0/0"]
+  security_group_id = aws_eks_cluster.this.vpc_config[0].cluster_security_group_id
+}
+
+resource "aws_security_group_rule" "node_nodeport_ingress_billing_service" {
+  description       = "NodePort do soat-billing-service (k8s/service.yaml)"
+  type              = "ingress"
+  from_port         = 30082
+  to_port           = 30082
+  protocol          = "tcp"
+  cidr_blocks       = ["0.0.0.0/0"]
+  security_group_id = aws_eks_cluster.this.vpc_config[0].cluster_security_group_id
+}
+
+resource "aws_security_group_rule" "node_nodeport_ingress_execucao_service" {
+  description       = "NodePort do soat-execucao-service (k8s/service.yaml)"
+  type              = "ingress"
+  from_port         = 30083
+  to_port           = 30083
+  protocol          = "tcp"
+  cidr_blocks       = ["0.0.0.0/0"]
+  security_group_id = aws_eks_cluster.this.vpc_config[0].cluster_security_group_id
+}
+
 # most_recent = true, equivalente ao que o módulo fazia — resolve a versão
 # mais recente compatível com a versão do cluster, em vez do default do EKS.
 data "aws_eks_addon_version" "coredns" {
