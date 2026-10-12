@@ -17,11 +17,15 @@ resource "random_password" "rabbitmq" {
 }
 
 resource "helm_release" "rabbitmq" {
-  name       = "rabbitmq"
-  repository = "https://charts.bitnami.com/bitnami"
+  name = "rabbitmq"
+  # Bitnami descontinuou a publicação de charts versionados no índice clássico
+  # (charts.bitnami.com) em ago/2025 — "15.2.5" não resolve mais ali. Charts
+  # Bitnami agora vivem só no registro OCI; "16.0.14" é a última versão
+  # publicada no catálogo gratuito (registry-1.docker.io/bitnamicharts).
+  repository = "oci://registry-1.docker.io/bitnamicharts"
   chart      = "rabbitmq"
   namespace  = kubernetes_namespace.rabbitmq.metadata[0].name
-  version    = "15.2.5"
+  version    = "16.0.14"
 
   set {
     name  = "auth.username"
