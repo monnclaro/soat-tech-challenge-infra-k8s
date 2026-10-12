@@ -28,12 +28,14 @@ terraform {
   # Academy reseta a conta entre sessões, então bucket/tabela não podem
   # depender de terem sido criados manualmente uma única vez). O workflow
   # (.github/workflows/terraform.yml) cria bucket e tabela se não existirem,
-  # antes do terraform init — idempotente, roda em todo PR/push.
+  # antes do terraform init — idempotente, roda em todo PR/push. Sufixo
+  # "-augusto-2": o bucket "-augusto" original ficou órfão (pertence a uma
+  # conta antiga da AWS Academy, de uma sessão anterior, inacessível agora).
   backend "s3" {
-    bucket         = "soat-tech-challenge-tfstate-augusto"
+    bucket         = "soat-tech-challenge-tfstate-augusto-2"
     key            = "infra-k8s/terraform.tfstate"
     region         = "us-east-1"
-    dynamodb_table = "soat-tech-challenge-tfstate-lock-augusto"
+    dynamodb_table = "soat-tech-challenge-tfstate-lock-augusto-2"
     encrypt        = true
   }
 }

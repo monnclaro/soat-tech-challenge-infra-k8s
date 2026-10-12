@@ -22,13 +22,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4.2.2
 
-      # AWS Academy reseta a conta entre sessões — bucket/tabela do backend
-      # remoto do Terraform (compartilhado entre infra-k8s/infra-database/
-      # lambda) podem não existir ainda. Idempotente: só cria o que faltar.
+      # AWS Academy reseta a conta entre sessões — o bucket "-augusto" original
+      # ficou órfão (de uma sessão/conta anterior, inacessível agora). Sufixo
+      # "-augusto-2": idempotente, só cria o que faltar.
       - name: Bootstrap do backend remoto (S3 + DynamoDB)
         run: |
-          BUCKET="soat-tech-challenge-tfstate-augusto"
-          TABLE="soat-tech-challenge-tfstate-lock-augusto"
+          BUCKET="soat-tech-challenge-tfstate-augusto-2"
+          TABLE="soat-tech-challenge-tfstate-lock-augusto-2"
 
           # || true: outro repo (infra-database/lambda) pode estar criando o
           # mesmo bucket/tabela ao mesmo tempo — o create falha com "already
@@ -83,13 +83,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4.2.2
 
-      # AWS Academy reseta a conta entre sessões — bucket/tabela do backend
-      # remoto do Terraform (compartilhado entre infra-k8s/infra-database/
-      # lambda) podem não existir ainda. Idempotente: só cria o que faltar.
+      # AWS Academy reseta a conta entre sessões — o bucket "-augusto" original
+      # ficou órfão (de uma sessão/conta anterior, inacessível agora). Sufixo
+      # "-augusto-2": idempotente, só cria o que faltar.
       - name: Bootstrap do backend remoto (S3 + DynamoDB)
         run: |
-          BUCKET="soat-tech-challenge-tfstate-augusto"
-          TABLE="soat-tech-challenge-tfstate-lock-augusto"
+          BUCKET="soat-tech-challenge-tfstate-augusto-2"
+          TABLE="soat-tech-challenge-tfstate-lock-augusto-2"
 
           # || true: outro repo (infra-database/lambda) pode estar criando o
           # mesmo bucket/tabela ao mesmo tempo — o create falha com "already
