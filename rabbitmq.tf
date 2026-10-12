@@ -36,6 +36,15 @@ resource "helm_release" "rabbitmq" {
     value = "bitnamilegacy/rabbitmq"
   }
 
+  # O chart valida a imagem contra uma lista de "containers oficiais" e
+  # bloqueia o deploy ao detectar "bitnamilegacy" (não reconhecida) - gate
+  # de segurança introduzido junto com a migração acima, documentado em
+  # https://github.com/bitnami/charts/issues/30850. Sem alternativa gratuita.
+  set {
+    name  = "global.security.allowInsecureImages"
+    value = "true"
+  }
+
   set {
     name  = "auth.username"
     value = "soat"
