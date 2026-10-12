@@ -42,9 +42,13 @@ resource "helm_release" "rabbitmq" {
     value = "1"
   }
 
+  # Sem StorageClass no cluster (k8s 1.31 removeu o provisionamento in-tree de
+  # EBS; precisaria do addon EBS CSI Driver, que não instalamos). PVC ficaria
+  # Pending pra sempre e o pod nunca sobe. Projeto acadêmico, 1 réplica sem HA:
+  # disco efêmero é aceitável — mensagens em fila se perdem se o pod reiniciar.
   set {
-    name  = "persistence.size"
-    value = "1Gi"
+    name  = "persistence.enabled"
+    value = "false"
   }
 
   # Requests/limits enxutos de propósito: 3 APIs + este broker + MongoDB
