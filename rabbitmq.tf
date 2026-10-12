@@ -27,6 +27,15 @@ resource "helm_release" "rabbitmq" {
   namespace  = kubernetes_namespace.rabbitmq.metadata[0].name
   version    = "16.0.14"
 
+  # Migração "Secure Images" da Bitnami (ago/2025): a imagem "bitnami/rabbitmq"
+  # some do catálogo gratuito (fica só sob assinatura paga) — o chart ainda
+  # referencia ela por padrão, então o pod dá ImagePullBackOff. A última
+  # versão livre congelada mudou para o registro "bitnamilegacy".
+  set {
+    name  = "image.repository"
+    value = "bitnamilegacy/rabbitmq"
+  }
+
   set {
     name  = "auth.username"
     value = "soat"
