@@ -6,6 +6,16 @@ on:
   push:
     branches: [main]
 
+# Sem isso, merges em sequência rápida disparavam applies sobrepostos, cada um
+# brigando pelo lock do DynamoDB do mesmo state — um deles sempre falhava com
+# "Error acquiring the state lock", às vezes deixando o lock preso (run
+# cancelado/interrompido no meio) e travando TODOS os applies seguintes até
+# alguém apagar o item manualmente. Com isto, só roda um apply por vez — os
+# outros esperam na fila em vez de colidir.
+concurrency:
+  group: terraform-infra-k8s
+  cancel-in-progress: false
+
 # AWS Academy: credenciais de sessão temporárias (expiram com o Lab), não
 # suporta OIDC nem IAM role de longa duração — ver README > "AWS Academy".
 env:
@@ -67,7 +77,7 @@ jobs:
 
       - name: Terraform Plan
         run: |
-          terraform plan -input=false -no-color \
+          terraform plan -input=false -no-color -lock-timeout=5m \
             -var="lab_role_arn=${{ secrets.AWS_LAB_ROLE_ARN }}" \
             -var="new_relic_license_key=${{ secrets.NEW_RELIC_LICENSE_KEY }}" \
             -var="new_relic_account_id=${{ secrets.NEW_RELIC_ACCOUNT_ID }}" \
@@ -122,7 +132,7 @@ jobs:
 
       - name: Terraform Apply
         run: |
-          terraform apply -auto-approve -input=false \
+          terraform apply -auto-approve -input=false -lock-timeout=5m \
             -var="lab_role_arn=${{ secrets.AWS_LAB_ROLE_ARN }}" \
             -var="new_relic_license_key=${{ secrets.NEW_RELIC_LICENSE_KEY }}" \
             -var="new_relic_account_id=${{ secrets.NEW_RELIC_ACCOUNT_ID }}" \
