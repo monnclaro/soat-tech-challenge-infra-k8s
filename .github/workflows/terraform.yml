@@ -137,14 +137,17 @@ jobs:
       # pra ficar seguro de rodar em toda apply (se já importado, falha com "already
       # managed" — inofensivo); remover este step depois de confirmar que resolveu.
       - name: Importar parâmetros SSM que já existem (corrige drift de state)
+        # TF_VAR_* em vez de "-var=...${{ secrets.X }}" no run: — expandir secret direto
+        # no texto do script é um risco (SonarCloud: "Avoid expanding secrets in a run
+        # block"); via env, o shell só lê a variável, o valor nunca aparece no comando.
+        env:
+          TF_VAR_lab_role_arn: ${{ secrets.AWS_LAB_ROLE_ARN }}
+          TF_VAR_new_relic_license_key: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
+          TF_VAR_new_relic_account_id: ${{ secrets.NEW_RELIC_ACCOUNT_ID }}
+          TF_VAR_new_relic_api_key: ${{ secrets.NEW_RELIC_API_KEY }}
+          TF_VAR_new_relic_notification_email: ${{ secrets.NEW_RELIC_NOTIFICATION_EMAIL }}
         run: |
-          import() { terraform import -input=false \
-            -var="lab_role_arn=${{ secrets.AWS_LAB_ROLE_ARN }}" \
-            -var="new_relic_license_key=${{ secrets.NEW_RELIC_LICENSE_KEY }}" \
-            -var="new_relic_account_id=${{ secrets.NEW_RELIC_ACCOUNT_ID }}" \
-            -var="new_relic_api_key=${{ secrets.NEW_RELIC_API_KEY }}" \
-            -var="new_relic_notification_email=${{ secrets.NEW_RELIC_NOTIFICATION_EMAIL }}" \
-            "$1" "$2" || true; }
+          import() { terraform import -input=false "$1" "$2" || true; }
 
           import aws_ssm_parameter.cluster_name /soat/producao/eks/cluster-name
           import aws_ssm_parameter.cluster_endpoint /soat/producao/eks/cluster-endpoint
