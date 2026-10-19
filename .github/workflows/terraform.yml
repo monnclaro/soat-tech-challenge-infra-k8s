@@ -130,35 +130,35 @@ jobs:
       - name: Terraform Init
         run: terraform init -input=false
 
-      # Corrige o drift de state causado por uma corrida de applies anterior: esses 10
-      # parâmetros SSM já existem de verdade na AWS, mas o state não sabia disso, e o
-      # apply falhava com "ParameterAlreadyExists" ao tentar criá-los de novo. "import"
-      # só ensina o Terraform sobre o que já existe, sem alterar nenhum valor. Com "|| true"
-      # pra ficar seguro de rodar em toda apply (se já importado, falha com "already
-      # managed" — inofensivo); remover este step depois de confirmar que resolveu.
-      - name: Importar parâmetros SSM que já existem (corrige drift de state)
-        # TF_VAR_* em vez de "-var=...${{ secrets.X }}" no run: — expandir secret direto
-        # no texto do script é um risco (SonarCloud: "Avoid expanding secrets in a run
-        # block"); via env, o shell só lê a variável, o valor nunca aparece no comando.
-        env:
-          TF_VAR_lab_role_arn: ${{ secrets.AWS_LAB_ROLE_ARN }}
-          TF_VAR_new_relic_license_key: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
-          TF_VAR_new_relic_account_id: ${{ secrets.NEW_RELIC_ACCOUNT_ID }}
-          TF_VAR_new_relic_api_key: ${{ secrets.NEW_RELIC_API_KEY }}
-          TF_VAR_new_relic_notification_email: ${{ secrets.NEW_RELIC_NOTIFICATION_EMAIL }}
+      # Corrige o drift de state causado por reset do AWS Academy (apaga EC2/EKS, que
+      # custam, mas não o SSM Parameter Store, que é gratuito): esses 10 parâmetros já
+      # existem de verdade na AWS, mas o state não sabia disso, e o apply falhava com
+      # "ParameterAlreadyExists" ao tentar criá-los de novo.
+      #
+      # "terraform import" (tentado antes) NÃO funciona aqui: ele exige resolver a
+      # configuração de TODOS os providers do projeto antes de importar qualquer coisa,
+      # inclusive "kubernetes"/"helm" — que dependem do cluster EKS ainda nem existir
+      # nesse ponto ("Invalid provider configuration ... depends on values that cannot
+      # be determined until apply"). É uma limitação do "import" em si, não tem como
+      # contornar só com "-target". O "apply" normal não tem esse problema (ele resolve
+      # os providers na ordem certa conforme cria cada recurso) — por isso a correção é
+      # deletar os parâmetros órfãos direto via AWS CLI antes do apply, deixando o
+      # Terraform recriá-los do zero com os valores certos (já confirmado que funciona:
+      # o apply sempre passou de EKS/RabbitMQ sem problema, só travava nesses 10 no final).
+      - name: Remover parâmetros SSM órfãos (corrige drift de state)
         run: |
-          import() { terraform import -input=false "$1" "$2" || true; }
+          remover() { aws ssm delete-parameter --name "$1" || true; }
 
-          import aws_ssm_parameter.cluster_name /soat/producao/eks/cluster-name
-          import aws_ssm_parameter.cluster_endpoint /soat/producao/eks/cluster-endpoint
-          import aws_ssm_parameter.jwt_secret /soat/producao/jwt/secret
-          import aws_ssm_parameter.vpc_id /soat/producao/network/vpc-id
-          import aws_ssm_parameter.private_subnet_ids /soat/producao/network/private-subnet-ids
-          import aws_ssm_parameter.eks_node_sg_id /soat/producao/network/eks-node-sg-id
-          import aws_ssm_parameter.vpc_cidr /soat/producao/network/vpc-cidr
-          import aws_ssm_parameter.rabbitmq_host /soat/producao/rabbitmq/host
-          import aws_ssm_parameter.rabbitmq_username /soat/producao/rabbitmq/username
-          import aws_ssm_parameter.rabbitmq_password /soat/producao/rabbitmq/password
+          remover /soat/producao/eks/cluster-name
+          remover /soat/producao/eks/cluster-endpoint
+          remover /soat/producao/jwt/secret
+          remover /soat/producao/network/vpc-id
+          remover /soat/producao/network/private-subnet-ids
+          remover /soat/producao/network/eks-node-sg-id
+          remover /soat/producao/network/vpc-cidr
+          remover /soat/producao/rabbitmq/host
+          remover /soat/producao/rabbitmq/username
+          remover /soat/producao/rabbitmq/password
 
       - name: Terraform Apply
         run: |
